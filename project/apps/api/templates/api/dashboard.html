@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head><title>StockEdge Dashboard</title></head>
+<body>
+  <h1>StockEdge Daily Pipeline</h1>
+  <form method="post">{% csrf_token %}<button type="submit">Run Daily Ranking Process</button></form>
+  <h2>Today's Rankings ({{ today }})</h2>
+  <ul>
+    {% for row in rankings %}
+      <li>#{{ row.rank }} {{ row.symbol }} — {{ row.score }}</li>
+    {% empty %}
+      <li>No rankings yet. Run the process.</li>
+    {% endfor %}
+  </ul>
+  <a href="/ui/prediction/">Prediction Lookup</a>
+</body>
+</html>

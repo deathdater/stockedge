@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<head><title>Stock Prediction</title></head>
+<body>
+  <h1>Prediction by Symbol</h1>
+  <form method="get">
+    <input name="symbol" value="{{ symbol }}" placeholder="e.g. INFY" />
+    <button type="submit">Lookup</button>
+  </form>
+  {% if prediction %}
+    <h2>{{ prediction.symbol }} ({{ prediction.date }})</h2>
+    <p>Rank: {{ prediction.rank }}</p>
+    <p>Score: {{ prediction.score }}</p>
+    <pre>{{ prediction.inputs }}</pre>
+  {% endif %}
+  <a href="/ui/">Back to Dashboard</a>
+</body>
+</html>
