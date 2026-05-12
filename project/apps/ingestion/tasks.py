@@ -8,7 +8,7 @@ import zipfile
 from datetime import datetime, timedelta
 
 import requests
-from celery import chain, shared_task
+from celery import chunks, shared_task
 from django.db import transaction
 from django.utils import timezone
 
@@ -37,12 +37,15 @@ def _format_yy(date_obj: datetime) -> str:
     return date_obj.strftime("%d%m%y")
 
 
-def _download_zip(date_obj: datetime) -> tuple[bytes, str, str]:
+def _download_zip(date_obj: datetime) -> tuple[bytes, str, str] | None:
     date_yy = _format_yy(date_obj)
     url = BHAVCOPY_URL_TEMPLATE.format(date_yy=date_yy)
     response = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
     if response.status_code >= 500:
         raise TransientDownloadError(f"server error status={response.status_code}")
+    if response.status_code == 404:
+        # No bhavcopy for this date — likely a market holiday
+        return None
     response.raise_for_status()
     payload = response.content
     return payload, hashlib.sha256(payload).hexdigest(), url
@@ -75,7 +78,18 @@ def download_bhavcopy(self, date_str: str, expected_sha256: str | None = None):
     incr("ingestion_runs_started")
 
     try:
-        zip_bytes, actual_hash, source_url = _download_zip(date_obj)
+        result = _download_zip(date_obj)
+        if result is None:
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            run.status = IngestionRun.Status.SKIPPED if hasattr(IngestionRun.Status, "SKIPPED") else IngestionRun.Status.FAILED
+            run.finished_at = timezone.now()
+            run.elapsed_ms = elapsed_ms
+            run.error_message = "No bhavcopy available (404) — likely a market holiday"
+            run.save()
+            logger.info("ingestion.run.skipped", extra={"event": "ingestion.run.skipped", "run_id": run.id, "date": date_str})
+            return {"run_id": run.id, "date": date_str, "status": "skipped"}
+
+        zip_bytes, actual_hash, source_url = result
         if expected_sha256 and actual_hash != expected_sha256:
             raise ValueError("checksum mismatch")
 
@@ -150,20 +164,21 @@ def fetch_last_10_years(self, end_date_str: str | None = None):
     end_date = datetime.strptime(end_date_str, "%d%m%Y").date() if end_date_str else timezone.now().date()
     start_date = end_date - timedelta(days=3650)
 
-    tasks = []
+    date_args = []
     cursor = start_date
     while cursor <= end_date:
         if cursor.weekday() < 5:
-            tasks.append(download_bhavcopy.s(cursor.strftime("%d%m%Y")))
+            date_args.append((cursor.strftime("%d%m%Y"),))
         cursor += timedelta(days=1)
 
-    if not tasks:
+    if not date_args:
         return {"scheduled": 0, "start_date": start_date.isoformat(), "end_date": end_date.isoformat()}
 
-    chain(*tasks).apply_async(queue="ingestion")
-    logger.info("ingestion.backfill.scheduled", extra={"event": "ingestion.backfill.scheduled", "scheduled": len(tasks), "start_date": start_date.isoformat(), "end_date": end_date.isoformat()})
-    incr("ingestion_backfill_scheduled_days", len(tasks))
-    return {"scheduled": len(tasks), "start_date": start_date.isoformat(), "end_date": end_date.isoformat()}
+    # Use chunks to batch independent tasks (50 per group) on the ingestion queue
+    download_bhavcopy.chunks(date_args, 50).apply_async(queue="ingestion")
+    logger.info("ingestion.backfill.scheduled", extra={"event": "ingestion.backfill.scheduled", "scheduled": len(date_args), "start_date": start_date.isoformat(), "end_date": end_date.isoformat()})
+    incr("ingestion_backfill_scheduled_days", len(date_args))
+    return {"scheduled": len(date_args), "start_date": start_date.isoformat(), "end_date": end_date.isoformat()}
 
 
 @shared_task
@@ -173,6 +188,7 @@ def get_last_10_years_fetch_status(limit: int = 3650):
         "total_runs": len(runs),
         "success": sum(1 for r in runs if r.status == IngestionRun.Status.SUCCESS),
         "failed": sum(1 for r in runs if r.status == IngestionRun.Status.FAILED),
+        "skipped": sum(1 for r in runs if r.status == IngestionRun.Status.SKIPPED),
         "started": sum(1 for r in runs if r.status == IngestionRun.Status.STARTED),
     }
     by_date = [

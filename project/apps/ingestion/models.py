@@ -6,6 +6,7 @@ class IngestionRun(models.Model):
         STARTED = "started", "Started"
         SUCCESS = "success", "Success"
         FAILED = "failed", "Failed"
+        SKIPPED = "skipped", "Skipped"
 
     source = models.CharField(max_length=64, default="bhavcopy")
     source_date = models.DateField(db_index=True)
