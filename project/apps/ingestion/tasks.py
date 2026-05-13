@@ -206,3 +206,56 @@ def get_last_10_years_fetch_status(limit: int = 3650):
         for run in runs
     ]
     return {"summary": summary, "results": by_date}
+
+
+@shared_task(bind=True)
+def catch_up_ingestion(self):
+    """Ingest missing dates from the last successful ingestion up to yesterday.
+
+    Fully additive — skips dates already ingested (success or skipped).
+    """
+    from project.apps.market_data.models import DailyCandle
+
+    yesterday = (timezone.now() - timedelta(days=1)).date()
+
+    # Find the latest date we have candle data for
+    latest_candle = DailyCandle.objects.order_by("-date").values_list("date", flat=True).first()
+    if not latest_candle:
+        # No data at all — start from 30 days ago as a sensible default
+        start_date = yesterday - timedelta(days=30)
+    else:
+        # Start from the day after the latest candle
+        start_date = latest_candle + timedelta(days=1)
+
+    if start_date > yesterday:
+        logger.info("catch_up_ingestion: already up to date (latest=%s, yesterday=%s)", latest_candle, yesterday)
+        return {"scheduled": 0, "start_date": str(start_date), "end_date": str(yesterday), "reason": "up_to_date"}
+
+    # Find dates already ingested (success or skipped) to avoid re-doing them
+    already_done = set(
+        IngestionRun.objects.filter(
+            source="bhavcopy_daily",
+            source_date__range=(start_date, yesterday),
+            status__in=[IngestionRun.Status.SUCCESS, IngestionRun.Status.SKIPPED],
+        ).values_list("source_date", flat=True)
+    )
+
+    # Build list of missing weekday dates
+    date_args = []
+    cursor = start_date
+    while cursor <= yesterday:
+        if cursor.weekday() < 5 and cursor not in already_done:
+            date_args.append((cursor.strftime("%d%m%Y"),))
+        cursor += timedelta(days=1)
+
+    if not date_args:
+        logger.info("catch_up_ingestion: no missing dates between %s and %s", start_date, yesterday)
+        return {"scheduled": 0, "start_date": str(start_date), "end_date": str(yesterday), "reason": "all_done"}
+
+    download_bhavcopy.chunks(date_args, 50).apply_async(queue="ingestion")
+    logger.info(
+        "catch_up_ingestion: scheduled %d dates from %s to %s",
+        len(date_args), start_date, yesterday,
+    )
+    incr("ingestion_catchup_scheduled_days", len(date_args))
+    return {"scheduled": len(date_args), "start_date": str(start_date), "end_date": str(yesterday)}

@@ -101,6 +101,21 @@ def trigger_ranking_only(request: HttpRequest) -> HttpResponse:
     return redirect(f"/ui/?date={run_date.isoformat()}")
 
 
+@require_POST
+def trigger_catch_up(request: HttpRequest) -> JsonResponse:
+    """Trigger incremental ingestion from last ingested date to yesterday. Additive only."""
+    from project.apps.ingestion.tasks import catch_up_ingestion
+
+    result = catch_up_ingestion.apply_async()
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+    return JsonResponse({
+        "status": "dispatched",
+        "task_id": result.id,
+        "message": f"Catch-up ingestion dispatched. Will fetch missing dates up to {yesterday}.",
+    })
+
+
 @require_GET
 def prediction_page(request: HttpRequest) -> HttpResponse:
     symbol = request.GET.get("symbol", "").upper().strip()

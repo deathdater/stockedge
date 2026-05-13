@@ -418,6 +418,9 @@
           <input type="date" id="run-date" value="{{ selected_date }}"
                  {% if min_date %}min="{{ min_date|date:'Y-m-d' }}"{% endif %}
                  {% if max_date %}max="{{ max_date|date:'Y-m-d' }}"{% endif %}>
+          <button class="btn btn-amber" id="btn-catch-up" onclick="triggerCatchUp()">
+            📥 Ingest to Yesterday
+          </button>
           <button class="btn btn-primary" id="btn-full-pipeline" onclick="triggerPipeline()">
             ▶ Run Full Pipeline
           </button>
@@ -587,6 +590,36 @@
         showToast('Error', e.message);
         btn.disabled = false;
         btn.textContent = '▶ Run Full Pipeline';
+      }
+    }
+
+    async function triggerCatchUp() {
+      const btn = document.getElementById('btn-catch-up');
+      btn.disabled = true;
+      btn.textContent = '⏳ Dispatching...';
+      document.getElementById('pipeline-dot').className = 'status-dot live';
+
+      try {
+        const resp = await fetch('/ui/trigger/catch-up/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCSRF(),
+          },
+          body: '',
+        });
+        const data = await resp.json();
+        showToast('Ingestion Dispatched', data.message, 6000);
+        btn.textContent = '✓ Dispatched';
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = '📥 Ingest to Yesterday';
+          document.getElementById('pipeline-dot').className = 'status-dot idle';
+        }, 5000);
+      } catch (e) {
+        showToast('Error', e.message);
+        btn.disabled = false;
+        btn.textContent = '📥 Ingest to Yesterday';
       }
     }
 
