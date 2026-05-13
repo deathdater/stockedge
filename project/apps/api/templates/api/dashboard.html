@@ -429,6 +429,30 @@
           </button>
         </div>
       </div>
+      <div class="section-body" style="padding: 12px 20px;">
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+          <span style="font-size:12px; color:var(--text-muted);">
+            Latest ingested: <strong style="color:var(--accent-cyan)">{{ latest_date }}</strong>
+            · Viewing: <strong style="color:var(--text-primary)">{{ run_date }}</strong>
+            · {{ candles_count }} candles on this date
+          </span>
+        </div>
+        {% if ranked_dates %}
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:center;">
+          <span style="font-size:11px; color:var(--text-muted); font-weight:500;">Ranked dates:</span>
+          {% for d in ranked_dates %}
+          <a href="/ui/?date={{ d|date:'Y-m-d' }}"
+             style="padding:3px 10px; border-radius:99px; font-size:11px; font-weight:600;
+                    text-decoration:none; transition:all 0.2s;
+                    {% if d == run_date %}background:var(--accent-blue); color:white;
+                    {% else %}background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-secondary);
+                    {% endif %}">
+            {{ d|date:'d M Y' }}
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
     </div>
 
     <!-- Trained Models -->

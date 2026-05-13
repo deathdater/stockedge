@@ -16,14 +16,18 @@ from project.apps.rankings.models import DailyRanking
 
 @require_http_methods(["GET", "POST"])
 def dashboard(request: HttpRequest) -> HttpResponse:
+    # Find the latest date with ingested candle data
+    latest_candle_date = DailyCandle.objects.order_by("-date").values_list("date", flat=True).first()
+    default_date = latest_candle_date or date.today()
+
     selected_date = request.GET.get("date", "")
     if selected_date:
         try:
             run_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
         except ValueError:
-            run_date = date.today()
+            run_date = default_date
     else:
-        run_date = date.today()
+        run_date = default_date
 
     rankings = DailyRanking.objects.filter(date=run_date).order_by("rank")[:25]
 
@@ -39,16 +43,23 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     min_date = date_range.first() if date_range.exists() else None
     max_date = date_range.last() if date_range.exists() else None
 
+    # Recent dates with rankings already computed
+    ranked_dates = list(
+        DailyRanking.objects.order_by("-date").values_list("date", flat=True).distinct()[:10]
+    )
+
     context = {
         "rankings": rankings,
         "run_date": run_date,
-        "selected_date": selected_date or run_date.isoformat(),
+        "selected_date": run_date.isoformat(),
+        "latest_date": default_date,
         "features_count": features_count,
         "labels_count": labels_count,
         "candles_count": candles_count,
         "model_runs": model_runs,
         "min_date": min_date,
         "max_date": max_date,
+        "ranked_dates": ranked_dates,
         "ingestion_success": ingestion_stats.filter(status="success").count(),
         "ingestion_total": ingestion_stats.count(),
         "total_candles": DailyCandle.objects.count(),
