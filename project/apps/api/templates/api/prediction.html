@@ -1,18 +1,558 @@
+{% load static %}
 <!doctype html>
-<html>
-<head><title>Stock Prediction</title></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if symbol %}{{ symbol }} Prediction{% else %}Stock Prediction{% endif %} — StockEdge</title>
+  <meta name="description" content="ML-powered stock prediction and analysis for {{ symbol|default:'NSE stocks' }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-card: #1a2234;
+      --bg-card-hover: #1f2b42;
+      --border: #2a3a52;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --gradient-blue: linear-gradient(135deg, #3b82f6, #06b6d4);
+      --gradient-green: linear-gradient(135deg, #10b981, #059669);
+      --gradient-red: linear-gradient(135deg, #ef4444, #dc2626);
+      --shadow: 0 4px 24px rgba(0,0,0,0.3);
+      --radius: 12px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+    .header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      background: var(--gradient-blue);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+      text-decoration: none;
+    }
+    .logo span { font-weight: 300; opacity: 0.7; }
+    .nav-links { display: flex; gap: 8px; }
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .nav-links a:hover, .nav-links a.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+    .main { max-width: 1200px; margin: 0 auto; padding: 24px 32px; }
+
+    /* Search Section */
+    .search-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .search-form {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .search-input {
+      flex: 1;
+      min-width: 200px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      outline: none;
+      transition: border-color 0.2s;
+      text-transform: uppercase;
+    }
+    .search-input:focus { border-color: var(--accent-blue); }
+    .search-input::placeholder {
+      text-transform: none;
+      font-weight: 400;
+      letter-spacing: 0;
+      color: var(--text-muted);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+    .btn-primary { background: var(--gradient-blue); color: white; }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    /* Quick picks */
+    .quick-picks {
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .quick-picks-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .quick-pick {
+      padding: 4px 12px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--accent-cyan);
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .quick-pick:hover {
+      border-color: var(--accent-cyan);
+      background: rgba(6,182,212,0.1);
+    }
+
+    /* Prediction Hero */
+    .prediction-hero {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .prediction-hero::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+    }
+    .hero-bullish::before { background: var(--gradient-green); }
+    .hero-bearish::before { background: var(--gradient-red); }
+
+    .hero-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .hero-symbol {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+    .hero-meta {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    .hero-rank {
+      font-size: 14px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 99px;
+    }
+    .hero-rank-top { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1a1a1a; }
+    .hero-rank-mid { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); }
+    .hero-date {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Score display */
+    .score-display {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+    .score-item {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+    .score-item-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .score-item-value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .score-item-bar {
+      margin-top: 8px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .score-item-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+    .fill-blue { background: var(--accent-blue); }
+    .fill-purple { background: var(--accent-purple); }
+    .fill-amber { background: var(--accent-amber); }
+    .fill-red { background: var(--accent-red); }
+    .fill-green { background: var(--accent-green); }
+
+    /* Section */
+    .section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .section-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-body { padding: 20px; }
+
+    /* Features */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .feature-item {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .feature-name {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .feature-value {
+      font-size: 14px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Labels table */
+    .labels-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .labels-table th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+    .labels-table td {
+      padding: 10px 12px;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(42,58,82,0.4);
+      font-variant-numeric: tabular-nums;
+    }
+    .dir-bullish { color: var(--accent-green); font-weight: 600; }
+    .dir-bearish { color: var(--accent-red); font-weight: 600; }
+    .dir-neutral { color: var(--text-muted); }
+
+    /* Price table */
+    .price-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .price-table th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      text-align: right;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+    .price-table th:first-child { text-align: left; }
+    .price-table td {
+      padding: 8px 12px;
+      font-size: 13px;
+      text-align: right;
+      border-bottom: 1px solid rgba(42,58,82,0.3);
+      font-variant-numeric: tabular-nums;
+    }
+    .price-table td:first-child { text-align: left; color: var(--text-secondary); }
+    .price-table tr:hover td { background: var(--bg-card-hover); }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 768px) {
+      .two-col { grid-template-columns: 1fr; }
+      .main { padding: 16px; }
+      .hero-symbol { font-size: 24px; }
+    }
+  </style>
+</head>
 <body>
-  <h1>Prediction by Symbol</h1>
-  <form method="get">
-    <input name="symbol" value="{{ symbol }}" placeholder="e.g. INFY" />
-    <button type="submit">Lookup</button>
-  </form>
-  {% if prediction %}
-    <h2>{{ prediction.symbol }} ({{ prediction.date }})</h2>
-    <p>Rank: {{ prediction.rank }}</p>
-    <p>Score: {{ prediction.score }}</p>
-    <pre>{{ prediction.inputs }}</pre>
-  {% endif %}
-  <a href="/ui/">Back to Dashboard</a>
+  <header class="header">
+    <a href="/ui/" class="logo">StockEdge <span>ML Pipeline</span></a>
+    <nav class="nav-links">
+      <a href="/ui/">Dashboard</a>
+      <a href="/ui/prediction/" class="active">Predictions</a>
+      <a href="/admin/" target="_blank">Admin</a>
+    </nav>
+  </header>
+
+  <main class="main">
+    <!-- Search -->
+    <div class="search-section">
+      <form class="search-form" method="get" id="search-form">
+        <input type="text" name="symbol" class="search-input" id="symbol-input"
+               value="{{ symbol }}" placeholder="Enter stock symbol (e.g. INFY, TCS, RELIANCE)"
+               autocomplete="off" list="symbol-list">
+        <datalist id="symbol-list">
+          {% for s in top_symbols %}
+          <option value="{{ s }}">
+          {% endfor %}
+        </datalist>
+        <button type="submit" class="btn btn-primary">🔍 Lookup</button>
+        <a href="/ui/" class="btn btn-secondary">← Dashboard</a>
+      </form>
+      {% if top_symbols %}
+      <div class="quick-picks">
+        <span class="quick-picks-label">Recent:</span>
+        {% for s in top_symbols|slice:":12" %}
+        <a href="/ui/prediction/?symbol={{ s }}" class="quick-pick">{{ s }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    {% if prediction %}
+    <!-- Prediction Hero -->
+    <div class="prediction-hero {% if prediction.score > 0 %}hero-bullish{% else %}hero-bearish{% endif %}">
+      <div class="hero-top">
+        <div>
+          <div class="hero-symbol">{{ prediction.symbol }}</div>
+          <div class="hero-date">Ranked on {{ prediction.date }}</div>
+        </div>
+        <div class="hero-meta">
+          <span class="hero-rank {% if prediction.rank <= 5 %}hero-rank-top{% else %}hero-rank-mid{% endif %}">
+            #{{ prediction.rank }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Ensemble Score + Components -->
+      <div class="score-display">
+        <div class="score-item">
+          <div class="score-item-label">Ensemble Score</div>
+          <div class="score-item-value" style="color: {% if prediction.score > 0 %}var(--accent-green){% else %}var(--accent-red){% endif %}">
+            {{ prediction.score|floatformat:4 }}
+          </div>
+          <div class="score-item-bar">
+            <div class="score-item-fill fill-green" style="width: {{ prediction.score|floatformat:0 }}%"></div>
+          </div>
+        </div>
+        {% for key, val in prediction.inputs.items %}
+        <div class="score-item">
+          <div class="score-item-label">{{ key }}</div>
+          <div class="score-item-value">{{ val|floatformat:4 }}</div>
+          <div class="score-item-bar">
+            {% with bar_width=val|floatformat:0 %}
+            <div class="score-item-fill {% if key == 'trend' %}fill-blue{% elif key == 'confidence' %}fill-purple{% elif key == 'volatility' %}fill-amber{% elif key == 'risk' %}fill-red{% else %}fill-blue{% endif %}"
+                 style="width: {% if val > 0 %}{{ val|floatformat:0 }}{% else %}10{% endif %}%"></div>
+            {% endwith %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="two-col">
+      <!-- Features -->
+      {% if features %}
+      <div class="section">
+        <div class="section-header">📐 Features ({{ features.feature_set }})</div>
+        <div class="section-body">
+          <div class="features-grid">
+            {% for key, val in features.values.items %}
+            <div class="feature-item">
+              <span class="feature-name">{{ key }}</span>
+              <span class="feature-value" style="color: {% if val > 0 %}var(--accent-green){% elif val < 0 %}var(--accent-red){% else %}var(--text-secondary){% endif %}">
+                {{ val|floatformat:6 }}
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Labels -->
+      {% if labels %}
+      <div class="section">
+        <div class="section-header">🏷️ Prediction Labels (5-day horizon)</div>
+        <div class="section-body">
+          <table class="labels-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Future Return</th>
+                <th>Direction</th>
+                <th>Horizon</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for label in labels %}
+              <tr>
+                <td>{{ label.date }}</td>
+                <td style="color: {% if label.future_return > 0 %}var(--accent-green){% else %}var(--accent-red){% endif %}; font-weight: 600;">
+                  {% if label.future_return > 0 %}+{% endif %}{{ label.future_return|floatformat:4 }}%
+                </td>
+                <td>
+                  {% if label.direction == 1 %}
+                    <span class="dir-bullish">▲ Bullish</span>
+                  {% elif label.direction == -1 %}
+                    <span class="dir-bearish">▼ Bearish</span>
+                  {% else %}
+                    <span class="dir-neutral">— Neutral</span>
+                  {% endif %}
+                </td>
+                <td style="color: var(--text-muted);">{{ label.horizon_days }}d</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Price History -->
+    {% if price_history %}
+    <div class="section">
+      <div class="section-header">📈 Price History (last 30 days)</div>
+      <div class="section-body" style="overflow-x:auto;">
+        <table class="price-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Open</th>
+              <th>High</th>
+              <th>Low</th>
+              <th>Close</th>
+              <th>Volume</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for candle in price_history %}
+            <tr>
+              <td>{{ candle.date }}</td>
+              <td>{{ candle.open|floatformat:2 }}</td>
+              <td style="color: var(--accent-green);">{{ candle.high|floatformat:2 }}</td>
+              <td style="color: var(--accent-red);">{{ candle.low|floatformat:2 }}</td>
+              <td style="font-weight:600;">{{ candle.close|floatformat:2 }}</td>
+              <td style="color: var(--text-secondary);">{{ candle.volume|floatformat:0 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% elif symbol %}
+    <div class="section">
+      <div class="section-body" style="text-align:center; padding:48px;">
+        <p style="font-size:18px; margin-bottom:8px;">No predictions found for <strong>{{ symbol }}</strong></p>
+        <p style="color:var(--text-muted); font-size:14px;">
+          Run the pipeline first to generate rankings, or check the symbol spelling.
+        </p>
+        <a href="/ui/" class="btn btn-primary" style="margin-top:16px;">← Back to Dashboard</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="section">
+      <div class="section-body" style="text-align:center; padding:48px;">
+        <p style="font-size:18px;">Enter a stock symbol above to view predictions</p>
+        <p style="color:var(--text-muted); font-size:14px; margin-top:8px;">
+          Search any NSE equity symbol to see ML-powered rankings, features, and labels.
+        </p>
+      </div>
+    </div>
+    {% endif %}
+  </main>
 </body>
 </html>

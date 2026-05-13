@@ -1,17 +1,604 @@
+{% load static %}
 <!doctype html>
-<html>
-<head><title>StockEdge Dashboard</title></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StockEdge — ML Pipeline Dashboard</title>
+  <meta name="description" content="StockEdge ML-powered stock ranking and prediction pipeline dashboard">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-card: #1a2234;
+      --bg-card-hover: #1f2b42;
+      --border: #2a3a52;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --gradient-blue: linear-gradient(135deg, #3b82f6, #06b6d4);
+      --gradient-green: linear-gradient(135deg, #10b981, #059669);
+      --gradient-amber: linear-gradient(135deg, #f59e0b, #d97706);
+      --gradient-purple: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      --shadow: 0 4px 24px rgba(0,0,0,0.3);
+      --radius: 12px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+    /* Header */
+    .header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      background: var(--gradient-blue);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    .logo span { font-weight: 300; opacity: 0.7; }
+    .nav-links { display: flex; gap: 8px; }
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .nav-links a:hover, .nav-links a.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+    /* Main */
+    .main { max-width: 1400px; margin: 0 auto; padding: 24px 32px; }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent-blue);
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .stat-card:nth-child(1)::before { background: var(--gradient-blue); }
+    .stat-card:nth-child(2)::before { background: var(--gradient-green); }
+    .stat-card:nth-child(3)::before { background: var(--gradient-amber); }
+    .stat-card:nth-child(4)::before { background: var(--gradient-purple); }
+    .stat-card:nth-child(5)::before { background: var(--gradient-blue); }
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .stat-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 6px;
+    }
+
+    /* Section */
+    .section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .section-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-body { padding: 20px; }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    input[type="date"] {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="date"]:focus { border-color: var(--accent-blue); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: var(--gradient-blue);
+      color: white;
+    }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover {
+      border-color: var(--accent-blue);
+      color: var(--text-primary);
+    }
+    .btn-green { background: var(--gradient-green); color: white; }
+    .btn-amber { background: var(--gradient-amber); color: #1a1a1a; }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Rankings Table */
+    .rankings-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .rankings-table th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      text-align: left;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+    .rankings-table td {
+      padding: 12px 16px;
+      font-size: 14px;
+      border-bottom: 1px solid rgba(42,58,82,0.5);
+      transition: background 0.15s;
+    }
+    .rankings-table tr:hover td {
+      background: var(--bg-card-hover);
+    }
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .rank-1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1a1a1a; }
+    .rank-2 { background: linear-gradient(135deg, #cbd5e1, #94a3b8); color: #1a1a1a; }
+    .rank-3 { background: linear-gradient(135deg, #d97706, #b45309); color: white; }
+    .rank-other { background: var(--bg-secondary); color: var(--text-secondary); }
+    .symbol-link {
+      color: var(--accent-cyan);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+    .symbol-link:hover { color: var(--accent-blue); }
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .score-bar-fill {
+      height: 6px;
+      border-radius: 3px;
+      background: var(--gradient-blue);
+      min-width: 4px;
+      transition: width 0.3s;
+    }
+    .score-val {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      min-width: 60px;
+    }
+    .component-pills {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .pill-trend { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+    .pill-confidence { background: rgba(139,92,246,0.15); color: var(--accent-purple); }
+    .pill-volatility { background: rgba(245,158,11,0.15); color: var(--accent-amber); }
+    .pill-risk { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+
+    /* Models */
+    .models-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .model-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .model-family {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: capitalize;
+      margin-bottom: 8px;
+    }
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding: 2px 0;
+    }
+    .metric-val { font-weight: 600; color: var(--text-primary); }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--accent-green);
+      border-radius: var(--radius);
+      padding: 16px 24px;
+      font-size: 14px;
+      box-shadow: var(--shadow);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      max-width: 400px;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast-title { font-weight: 600; margin-bottom: 4px; }
+    .toast-msg { color: var(--text-secondary); font-size: 12px; }
+
+    /* Status dot */
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .status-dot.live { background: var(--accent-green); animation: pulse 2s infinite; }
+    .status-dot.idle { background: var(--text-muted); }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+    }
+    .empty-state p { font-size: 14px; margin-top: 8px; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header { padding: 12px 16px; }
+      .main { padding: 16px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .controls { flex-direction: column; align-items: stretch; }
+    }
+  </style>
+</head>
 <body>
-  <h1>StockEdge Daily Pipeline</h1>
-  <form method="post">{% csrf_token %}<button type="submit">Run Daily Ranking Process</button></form>
-  <h2>Today's Rankings ({{ today }})</h2>
-  <ul>
-    {% for row in rankings %}
-      <li>#{{ row.rank }} {{ row.symbol }} — {{ row.score }}</li>
-    {% empty %}
-      <li>No rankings yet. Run the process.</li>
-    {% endfor %}
-  </ul>
-  <a href="/ui/prediction/">Prediction Lookup</a>
+  <header class="header">
+    <div class="logo">StockEdge <span>ML Pipeline</span></div>
+    <nav class="nav-links">
+      <a href="/ui/" class="active">Dashboard</a>
+      <a href="/ui/prediction/">Predictions</a>
+      <a href="/admin/" target="_blank">Admin</a>
+    </nav>
+  </header>
+
+  <main class="main">
+    <!-- Stats Overview -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Candles</div>
+        <div class="stat-value">{{ total_candles|floatformat:0 }}</div>
+        <div class="stat-sub">{{ total_symbols }} symbols tracked</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Ingestion Runs</div>
+        <div class="stat-value">{{ ingestion_success }}</div>
+        <div class="stat-sub">of {{ ingestion_total }} total runs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Features ({{ run_date }})</div>
+        <div class="stat-value" id="stat-features">{{ features_count }}</div>
+        <div class="stat-sub">baseline_v1 feature set</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Labels ({{ run_date }})</div>
+        <div class="stat-value" id="stat-labels">{{ labels_count }}</div>
+        <div class="stat-sub">5-day future return</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Trained Models</div>
+        <div class="stat-value">{{ model_runs|length }}</div>
+        <div class="stat-sub">4 family ensemble</div>
+      </div>
+    </div>
+
+    <!-- Pipeline Controls -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="status-dot" id="pipeline-dot"></span>
+          Pipeline Control
+        </div>
+        <div class="controls">
+          <input type="date" id="run-date" value="{{ selected_date }}"
+                 {% if min_date %}min="{{ min_date|date:'Y-m-d' }}"{% endif %}
+                 {% if max_date %}max="{{ max_date|date:'Y-m-d' }}"{% endif %}>
+          <button class="btn btn-primary" id="btn-full-pipeline" onclick="triggerPipeline()">
+            ▶ Run Full Pipeline
+          </button>
+          <button class="btn btn-green" id="btn-ranking" onclick="triggerRanking()">
+            ◉ Quick Ranking
+          </button>
+          <button class="btn btn-secondary" onclick="window.location.href='/ui/?date=' + document.getElementById('run-date').value">
+            🔍 View Date
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trained Models -->
+    {% if model_runs %}
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">🧠 Trained Models</div>
+      </div>
+      <div class="section-body">
+        <div class="models-grid">
+          {% for run in model_runs %}
+          <div class="model-card">
+            <div class="model-family">{{ run.model_family }}</div>
+            <div class="metric-row">
+              <span>Version</span>
+              <span class="metric-val">{{ run.model_version }}</span>
+            </div>
+            <div class="metric-row">
+              <span>Train Period</span>
+              <span class="metric-val">{{ run.train_start }} → {{ run.train_end }}</span>
+            </div>
+            {% for key, val in run.metrics.items %}
+            <div class="metric-row">
+              <span>{{ key }}</span>
+              <span class="metric-val">{{ val }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Rankings -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">📊 Rankings — {{ run_date }}</div>
+        <span style="font-size:12px; color:var(--text-muted)">{{ rankings|length }} stocks ranked</span>
+      </div>
+      {% if rankings %}
+      <table class="rankings-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Symbol</th>
+            <th>Score</th>
+            <th>Components</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rankings %}
+          <tr>
+            <td>
+              <span class="rank-badge {% if row.rank == 1 %}rank-1{% elif row.rank == 2 %}rank-2{% elif row.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+                {{ row.rank }}
+              </span>
+            </td>
+            <td>
+              <a href="/ui/prediction/?symbol={{ row.symbol }}" class="symbol-link">{{ row.symbol }}</a>
+            </td>
+            <td>
+              <div class="score-bar">
+                <span class="score-val">{{ row.score|floatformat:4 }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="component-pills">
+                {% for key, val in row.inputs.items %}
+                <span class="pill pill-{{ key }}">{{ key }}: {{ val|floatformat:3 }}</span>
+                {% endfor %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <p>No rankings for {{ run_date }}.</p>
+        <p>Run the pipeline or quick ranking to generate scores.</p>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+
+  <!-- Toast notification -->
+  <div class="toast" id="toast">
+    <div class="toast-title" id="toast-title"></div>
+    <div class="toast-msg" id="toast-msg"></div>
+  </div>
+
+  <script>
+    function showToast(title, msg, duration = 4000) {
+      const t = document.getElementById('toast');
+      document.getElementById('toast-title').textContent = title;
+      document.getElementById('toast-msg').textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), duration);
+    }
+
+    function getCSRF() {
+      return '{{ csrf_token }}';
+    }
+
+    async function triggerPipeline() {
+      const btn = document.getElementById('btn-full-pipeline');
+      const runDate = document.getElementById('run-date').value;
+      btn.disabled = true;
+      btn.textContent = '⏳ Dispatching...';
+      document.getElementById('pipeline-dot').className = 'status-dot live';
+
+      try {
+        const resp = await fetch('/ui/trigger/pipeline/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCSRF(),
+          },
+          body: 'run_date=' + encodeURIComponent(runDate),
+        });
+        const data = await resp.json();
+        showToast('Pipeline Dispatched', data.message);
+        btn.textContent = '✓ Dispatched';
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = '▶ Run Full Pipeline';
+        }, 3000);
+        // Poll for updates
+        pollStatus(runDate);
+      } catch (e) {
+        showToast('Error', e.message);
+        btn.disabled = false;
+        btn.textContent = '▶ Run Full Pipeline';
+      }
+    }
+
+    function triggerRanking() {
+      const runDate = document.getElementById('run-date').value;
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/ui/trigger/ranking/';
+      const csrf = document.createElement('input');
+      csrf.type = 'hidden'; csrf.name = 'csrfmiddlewaretoken'; csrf.value = getCSRF();
+      const dateInput = document.createElement('input');
+      dateInput.type = 'hidden'; dateInput.name = 'run_date'; dateInput.value = runDate;
+      form.appendChild(csrf);
+      form.appendChild(dateInput);
+      document.body.appendChild(form);
+      form.submit();
+    }
+
+    async function pollStatus(runDate) {
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 5000));
+        try {
+          const resp = await fetch('/ui/status/?date=' + encodeURIComponent(runDate));
+          const data = await resp.json();
+          document.getElementById('stat-features').textContent = data.features;
+          document.getElementById('stat-labels').textContent = data.labels;
+          if (data.rankings > 0) {
+            showToast('Pipeline Complete', `Rankings generated for ${runDate}`);
+            document.getElementById('pipeline-dot').className = 'status-dot idle';
+            setTimeout(() => window.location.reload(), 2000);
+            return;
+          }
+        } catch (e) { /* ignore */ }
+      }
+      document.getElementById('pipeline-dot').className = 'status-dot idle';
+    }
+  </script>
 </body>
 </html>
